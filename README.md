@@ -1,5 +1,3 @@
-# hello-world
-Determined to move on
 # 	DCDB编译及部署
 
 DCDB的核心引擎是百度开源baikaldb，编译、部署围绕baikaldb展开。
@@ -131,15 +129,12 @@ sh /home/work/BaikalDB/store/restart.sh --init
 3. 启动db
 
 - 启动db集群中的一个节点上的初始化脚本
-
-```shell
-sh /home/work/Baikal/init_db.sh
-```
-
+	```shell
+		sh /home/work/Baikal/init_db.sh
+	```
 - 启动所有db节点的baikaldb
-
-```shell
-sh /home/work/Baikal/store/restart.sh --init
-```
+	```shell
+		sh /home/work/Baikal/store/restart.sh --init
+	```
 
 
