@@ -1,149 +1,81 @@
-# 	DCDB编译及部署
+# DCDB监控指标说明
 
-DCDB的核心引擎是百度开源baikaldb，编译、部署围绕baikaldb展开。
+DCDB提供两种方式可以监控数据库性能及运行状况。一种是通过组件的端口查看组件运行的各项数据，另一种方式可以使用Prometheus+grafana构建直观的图标来监控数据。DCDB是一款基于主流思想的分布式数据库，其中包括db、meta、store三大组件。
 
-## Download
+## 端口查看
 
-下载BaikalDB源码，下载地址https://github.com/baidu/BaikalDB.git
+但我们成功的部署DCDB后，通过设置的ip+port就可以轻松的查看DCDB中组件的各项运行数据及环境变化的情况。以下图的部署的情况为例：
 
-``` shell
-git clone https://github.com/baidu/BaikalDB.git
-```
+| IP           | 组件  | 端口（默认） |
+| ------------ | ----- | ------------ |
+| 00.000.00.00 | db    | 8888         |
+| 00.000.00.00 | meta  | 8010         |
+| 00.000.00.00 | store | 8110         |
 
-## Compile（centos）
+Example：当我们向查看db组件的指标时，只需要在web上输入http://00.000.00.00:8888/，就会显示db的各项指标了，如下图：
 
-### 安装工具
+![企业微信截图_0fcbdf31-d6cf-4984-9e7a-8038f33d6a19](/Users/liuyong/Library/Containers/com.tencent.WeWorkMac/Data/Library/Application Support/WXWork/Temp/ScreenCapture/企业微信截图_0fcbdf31-d6cf-4984-9e7a-8038f33d6a19.png)
 
-1. 安装bazel（centos，v0.18.1及更早）
+由于很多指标是详细监控DCDB内部细节，这里就不一一说明指标的含义了，有兴趣可以阅读源代码来分析。
 
-```shell
-wget https://github.com/bazelbuild/bazel/releases/download/0.18.1/bazel-0.18.1-installer-linux-x86_64.sh
-sh bazel-0.18.1-installer-linux-x86_64.sh
-```
+## Prometheus+grafana
 
-2. 安装依赖
+使用这种方式是基于直观和横向监控的考虑出发，我们设置监控DCDB的重要的指标来监控DCDB的健康的情况和处于不同场景下DCDB的性能表现。
 
-```shell
-sudo yum install flex bison patch openssl-devel
-sudo yum install gcc-c++ (v4.8.2 or later)
-```
+### db的重要指标
 
-### 编译
+![企业微信截图_068b9086-3508-43b3-8fe1-494d29970429](/Users/liuyong/Library/Containers/com.tencent.WeWorkMac/Data/Library/Application Support/WXWork/Temp/ScreenCapture/企业微信截图_068b9086-3508-43b3-8fe1-494d29970429.png)
 
-```shell
-bazel build //:all
-```
+total_select_time_cost_qps(db)：db的select语句的qps总和。
 
-> 注意： 
->
-> 1. WORKSPACE中的以下配置：
->
-> ```shell
-> git_repository(
->  name = "com_github_brpc_brpc",
->  remote= "https://github.com/apache/incubator-brpc.git",
->  tag = "0.9.7-rc01",
-> )
-> ```
-> 2. 确认已经安装过automake，如果没有，通过下面的指令安装：
->
-> ```shell
-> yum install libtool -y
-> yum install automake.noarch
-> ```
-## 部署
+ total_dml_time_const_qps(db)：db总dml语句的qps总和。
 
-### 启动顺序
+select_time_cost_qps(db)：各个db节点中select语句的qps。
 
-meta->store->db，也就说首先启动所有的meta，然后启动所有的store，最后启动所有db。
+dml_time_const_qps(db)：各个节db点中dml语句的qps。
 
-### 准备脚本及目录
+![image-20200305180312052](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305180312052.png)
 
-为了方便部署，我们提前把需要运行的指令做成脚本，并把组件的目录结构组织在一起存放的BaikalDB.tar.gz文件中，直接解压缩到将要部署的目录。下面的假设要部署到/home/work/目录下进行讲解。
+select_time_cost_latency(db)：各个db节点中db的select延迟。
 
-### Meta部署
+dml_time_cost_latency(db)：各个db节点中db的dml延迟。
 
-1. 将编译生成的baikalMeta拷贝到/home/work/BaikalDB/meta/bin路径下，替换原有的baikalMeta文件。
+![image-20200305180550209](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305180550209.png)
 
-2. 修改/home/work/BaikalDB/meta/conf/gflags.conf配置文件：
+process_io_write_bytes_second：各个db进程每秒写io的速度。
 
-   ![image-20200304182906088](/Users/liuyong/Desktop/123/3.png)
+process_io_read_bytes_second：各个db进程每秒读io的速度。
 
-> 根据集群的具体场景可以修改的配置参数
->
-> meta_replica_numer：meta集群副本数
->
-> meta_port：meta的端口号（建议默认）
->
-> meta_server_bns：meta集群中每个meta的ip:meta_port
+![image-20200305180825404](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305180825404.png)
 
-3. 启动meta	
-- 首相要启动所有meta节点中的baikalMeta
+process_cpu_usage：各个db节点cpu使用情况。
 
-   ```shell
-   cd /home/work/BaikalDB/meta/
-   sh restart.sh --init
-   ```
-- 修改/home/work/BaikalDB/leader.sh中的地址为meta集群中的任一meta的地址(图中假设meta集群找那个有一个meta部署在10.152.22.38机器上，使用默认端口8010)。
-  
-   ![企业微信截图_3494c0ef-1595-427d-acd6-d820fb317acb](/Users/liuyong/Desktop/123/4.png)
-   
-- 启动meta集群中的一个节点的初始化脚本即可（此节点中的leader.sh必须按照上述修改过）
+### store的重要指标
 
-   ```shell
-   cd /home/work/BaikalDB/
-   sh init_meta.sh
-   ```
+![image-20200305181112333](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305181112333.png)
 
-### Store部署
+total_select_time_cost_qps(store)：store的select语句的qps总和。
 
-1. 将编译生成的baikalStore拷贝到/home/work/BaikalDB/store/bin路径下，替换原有的baikalStore文件。
-2. 修改/home/work/BaikalDB/store/conf/gflags.conf配置文件：
+total_dml_time_cost_qps(store)：store总dml语句的qps总和。
 
-![image-20200305152309709](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305152309709.png)
+select_time_cost_qps(store)：各个store节点中select语句的qps。
 
-> 根据集群的具体场景可以修改的配置参数：
->
-> meta_server_bns：meta集群的ip:meta_port（根据meta的配置）
->
-> store_port：store节点的端口号（建议默认）
->
-> resource_tag：必须与建表语句中的resource_tag一致
+dml_time_const_qps(store)：各个节store点中dml语句的qps。
 
-3. 启动所有store节点的baikalStore
+![image-20200305181402264](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305181402264.png)
 
-```shell
-cd /home/work/BaikalDB/store/
-sh restart.sh --init
-```
+select_time_cost_latency(store)：各个store节点中store的select延迟。
 
-### db部署
+dml_time_cost_latency(store)：各个store节点中store的dml延迟。
 
-1. 将编译生成的baikaldb拷贝到/home/work/BaikalDB/db/bin路径下，替换原有的baikaldb文件。
-2. 修改/home/work/BaikalDB/db/conf/gflags.conf配置文件：
+process_io_write_bytes_second：各个store进程每秒写io的速度。
 
-![image-20200304190503667](/Users/liuyong/Desktop/123/6.png)
+process_io_read_bytes_second：各个store进程每秒读io的速度。
 
-> 根据集群的具体场景可以修改的配置参数：
->
-> meta_server_bns：meta集群的ip:meta_port（根据meta的配置）
->
-> baikal_port：访问DCDB的端口号(建议默认)。
+![image-20200305181544630](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305181544630.png)
 
-3. 启动db
+process_cpu_usage：各个store节点cpu使用情况。
 
-- 启动db集群中的一个节点上的初始化脚本
+![image-20200305181618697](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305181618697.png)
 
-```shell
-cd /home/work/Baikal/
-sh init_db.sh
-```
-
-- 启动所有db节点的baikaldb
-
-```shell
-cd /home/work/Baikal/store/
-sh restart.sh --init
-```
-
-
+每个节点磁盘利用率的情况。
