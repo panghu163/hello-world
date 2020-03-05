@@ -34,16 +34,23 @@ sudo yum install gcc-c++ (v4.8.2 or later)
 bazel build //:all
 ```
 
-> 注意： WORKSPACE中的以下配置：
+> 注意： 
+>
+> 1. WORKSPACE中的以下配置：
 >
 > ```shell
 > git_repository(
->     name = "com_github_brpc_brpc",
->     remote= "https://github.com/apache/incubator-brpc.git",
->     tag = "0.9.7-rc01",
+>  name = "com_github_brpc_brpc",
+>  remote= "https://github.com/apache/incubator-brpc.git",
+>  tag = "0.9.7-rc01",
 > )
 > ```
-
+> 2. 确认已经安装过automake，如果没有，通过下面的指令安装：
+>
+> ```shell
+> yum install libtool -y
+> yum install automake.noarch
+> ```
 ## 部署
 
 ### 启动顺序
@@ -52,13 +59,7 @@ meta->store->db，也就说首先启动所有的meta，然后启动所有的stor
 
 ### 准备脚本及目录
 
-为了方便部署，我们提前把需要运行的指令做成脚本，并把组件的目录结构组织在一起存放的deploy文件中。快速部署可以直接使用deploy文件。
-
-![image-20200304175001237](/Users/liuyong/Desktop/123/image-20200304175001237.png)
-
-在将要部署DCDB集群的服务器上创建/home/work/BaikalDB目录。将deploy中的目录和文件全部拷贝到此目录下（如果一台服务器上部署一个store，可以忽略store1目录）。
-
-![image-20200304175710081](/Users/liuyong/Desktop/123/2.png)
+为了方便部署，我们提前把需要运行的指令做成脚本，并把组件的目录结构组织在一起存放的BaikalDB.tar.gz文件中，直接解压缩到将要部署的目录。下面的假设要部署到/home/work/目录下进行讲解。
 
 ### Meta部署
 
@@ -80,16 +81,18 @@ meta->store->db，也就说首先启动所有的meta，然后启动所有的stor
 - 首相要启动所有meta节点中的baikalMeta
 
    ```shell
-   sh /home/work/BaikalDB/meta/restart.sh --init
+   cd /home/work/BaikalDB/meta/
+   sh restart.sh --init
    ```
-- 修改meta/home/work/BaikalDB/leader.sh中的地址为meta集群中的任一meta的地址。
+- 修改/home/work/BaikalDB/leader.sh中的地址为meta集群中的任一meta的地址(图中假设meta集群找那个有一个meta部署在10.152.22.38机器上，使用默认端口8010)。
   
    ![企业微信截图_3494c0ef-1595-427d-acd6-d820fb317acb](/Users/liuyong/Desktop/123/4.png)
    
 - 启动meta集群中的一个节点的初始化脚本即可（此节点中的leader.sh必须按照上述修改过）
 
    ```shell
-   sh /home/work/BaikalDB/sh init_meta.sh
+   cd /home/work/BaikalDB/
+   sh init_meta.sh
    ```
 
 ### Store部署
@@ -97,7 +100,7 @@ meta->store->db，也就说首先启动所有的meta，然后启动所有的stor
 1. 将编译生成的baikalStore拷贝到/home/work/BaikalDB/store/bin路径下，替换原有的baikalStore文件。
 2. 修改/home/work/BaikalDB/store/conf/gflags.conf配置文件：
 
-![image-20200304184703461](/Users/liuyong/Desktop/123/5.png)
+![image-20200305152309709](/Users/liuyong/Library/Application Support/typora-user-images/image-20200305152309709.png)
 
 > 根据集群的具体场景可以修改的配置参数：
 >
@@ -110,7 +113,8 @@ meta->store->db，也就说首先启动所有的meta，然后启动所有的stor
 3. 启动所有store节点的baikalStore
 
 ```shell
-sh /home/work/BaikalDB/store/restart.sh --init
+cd /home/work/BaikalDB/store/
+sh restart.sh --init
 ```
 
 ### db部署
@@ -129,12 +133,17 @@ sh /home/work/BaikalDB/store/restart.sh --init
 3. 启动db
 
 - 启动db集群中的一个节点上的初始化脚本
-	```shell
-		sh /home/work/Baikal/init_db.sh
-	```
+
+```shell
+cd /home/work/Baikal/
+sh init_db.sh
+```
+
 - 启动所有db节点的baikaldb
-	```shell
-		sh /home/work/Baikal/store/restart.sh --init
-	```
+
+```shell
+cd /home/work/Baikal/store/
+sh restart.sh --init
+```
 
 
